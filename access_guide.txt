@@ -1,0 +1,19 @@
+# Beatwell Website Access Guide
+
+## 1. Local Network (LAN) Access
+You can access the website from other devices on the same Wi-Fi/Network.
+Use the following URL (based on your current IP):
+http://10.23.177.151:5001
+
+Note: Ensure your Windows Firewall allows Python to accept incoming connections on port 5001.
+
+## 2. Public Internet Access (Cloudflare Tunnel)
+Since `cloudflared` is installed, you can generate a public link easily.
+
+Run the provided script in PowerShell:
+`.\start_beatwell_public.ps1`
+
+This will:
+1. Ensure the website is running.
+2. Start a secure tunnel.
+3. Give you a link like `https://random-name.trycloudflare.com`.

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="bg-navy text-white py-5 text-center">
+    <div class="container">
+        <h1 class="font-heading display-4">Our Services</h1>
+        <p class="lead">Professional upholstery solutions for every need.</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    {% set icons = {
+        'Upholstery & Interior Works': '🛋️',
+        'Marine & Canvas Services': '🚤',
+        'Fabrication & Engineering': '🛠️',
+        'Textiles & Branding': '🧵',
+        'Outdoor & Utility Solutions': '🏕️',
+        'Cleaning & Maintenance': '🧼'
+    } %}
+    {% for category, items in grouped_services.items() %}
+    {% if items %}
+    <div class="mb-5">
+        <h2 class="font-heading text-forest border-bottom border-2 border-gold pb-2 mb-4">{{ icons.get(category, '') }} {{ category }}</h2>
+        <div class="row g-4">
+            {% for service in items %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h4 class="card-title text-navy">{{ service.name }}</h4>
+                        <p class="card-text">{{ service.description }}</p>
+                        <a href="{{ url_for('quote') }}" class="btn btn-gold btn-sm mt-2">Request a Quote</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% set ns = namespace(total=0) %}
+    {% for items in grouped_services.values() %}
+        {% set ns.total = ns.total + (items|length) %}
+    {% endfor %}
+    {% if ns.total == 0 %}
+    <div class="alert alert-info">
+        Services are being updated. Please check back soon or contact us directly.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

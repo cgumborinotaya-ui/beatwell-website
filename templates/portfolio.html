@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="bg-navy text-white py-5 text-center">
+    <div class="container">
+        <h1 class="font-heading display-4">Our Work</h1>
+        <p class="lead">Browse our gallery of completed projects.</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <div class="btn-group flex-wrap" role="group">
+            <button type="button" class="btn btn-outline-navy active m-1">All</button>
+            <button type="button" class="btn btn-outline-navy m-1">Upholstery</button>
+            <button type="button" class="btn btn-outline-navy m-1">Marine</button>
+            <button type="button" class="btn btn-outline-navy m-1">Fabrication</button>
+            <button type="button" class="btn btn-outline-navy m-1">Textiles</button>
+            <button type="button" class="btn btn-outline-navy m-1">Outdoor</button>
+            <button type="button" class="btn btn-outline-navy m-1">Cleaning</button>
+        </div>
+    </div>
+
+    {% if portfolio_groups %}
+    <div class="row g-4">
+        {% for g in portfolio_groups %}
+        <div class="col-12 col-lg-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="row g-0">
+                    <div class="col-6 position-relative">
+                        <a href="{{ url_for('static', filename='img/portfolio/' ~ g.before) }}" target="_blank" class="text-decoration-none">
+                            <img src="{{ url_for('static', filename='img/portfolio/' ~ g.before) }}" class="w-100" alt="Before" style="height: 260px; object-fit: cover;">
+                        </a>
+                        <span class="badge bg-navy position-absolute top-0 start-0 m-2">Before</span>
+                    </div>
+                    <div class="col-6 position-relative">
+                        <a href="{{ url_for('static', filename='img/portfolio/' ~ g.after) }}" target="_blank" class="text-decoration-none">
+                            <img src="{{ url_for('static', filename='img/portfolio/' ~ g.after) }}" class="w-100" alt="After" style="height: 260px; object-fit: cover;">
+                        </a>
+                        <span class="badge bg-gold position-absolute top-0 start-0 m-2 text-dark">After</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No portfolio images found yet. Add photos to <strong>static/img/portfolio</strong> and refresh this page.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

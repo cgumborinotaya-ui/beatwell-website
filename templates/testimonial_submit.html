@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="bg-navy text-white py-5 text-center">
+    <div class="container">
+        <h1 class="font-heading display-4">Leave a Testimonial</h1>
+        <p class="lead">Share your experience with Beatwell Upholstery.</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">Your Name</label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name" required maxlength="100">
+                        </div>
+                        <div class="mb-3">
+                            <label for="rating" class="form-label">Rating</label>
+                            <select class="form-select" id="rating" name="rating" required>
+                                <option value="5" selected>★★★★★ (5)</option>
+                                <option value="4">★★★★☆ (4)</option>
+                                <option value="3">★★★☆☆ (3)</option>
+                                <option value="2">★★☆☆☆ (2)</option>
+                                <option value="1">★☆☆☆☆ (1)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="content" class="form-label">Testimonial</label>
+                            <textarea class="form-control" id="content" name="content" rows="5" required maxlength="800" placeholder="Write your testimonial here..."></textarea>
+                            <div class="form-text">Your testimonial will appear after approval.</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-navy btn-lg">Submit Testimonial</button>
+                            <a href="{{ url_for('home') }}" class="btn btn-outline-navy">Back to Home</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

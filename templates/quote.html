@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="bg-navy text-white py-5 text-center">
+    <div class="container">
+        <h1 class="font-heading display-4">Request a Quote</h1>
+        <p class="lead">Tell us about your project and we'll get back to you with an estimate.</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="phone_number" class="form-label">Phone Number (WhatsApp enabled)</label>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="service_category" class="form-label">Service Category</label>
+                            <select class="form-select" id="service_category" name="service_category" required>
+                                <option value="" selected disabled>Select a category...</option>
+                                <option value="Upholstery & Interior Works">🛋️ Upholstery & Interior Works</option>
+                                <option value="Marine & Canvas Services">🚤 Marine & Canvas Services</option>
+                                <option value="Fabrication & Engineering">🛠️ Fabrication & Engineering</option>
+                                <option value="Textiles & Branding">🧵 Textiles & Branding</option>
+                                <option value="Outdoor & Utility Solutions">🏕️ Outdoor & Utility Solutions</option>
+                                <option value="Cleaning & Maintenance">🧼 Cleaning & Maintenance</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location (e.g., Kariba, Harare)</label>
+                            <input type="text" class="form-control" id="location" name="location" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description of Work</label>
+                            <textarea class="form-control" id="description" name="description" rows="4" placeholder="Please describe what you need done..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Upload Image or PDF (Optional)</label>
+                            <input class="form-control" type="file" id="image" name="image" accept="image/*,application/pdf">
+                            <div class="form-text">Upload a photo or PDF to help us give a more accurate quote.</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-navy btn-lg">Submit Request</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

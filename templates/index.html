@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section hero-slider text-center text-white" data-hero-images='{{ hero_images|tojson }}'>
+    <div class="hero-bg hero-bg-a"></div>
+    <div class="hero-bg hero-bg-b"></div>
+    <div class="hero-overlay"></div>
+    <div class="container hero-content">
+        <h1 class="display-3 font-heading fw-bold mb-4 text-white">Quality Upholstery & Comfort Solutions</h1>
+        <p class="lead mb-4 fs-3 text-white">Expert craftsmanship for Household, Marine, Camping, and Vehicles in Kariba.</p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="{{ url_for('quote') }}" class="btn btn-gold btn-lg px-4 py-3 shadow-lg">Request a Quote</a>
+            <a href="{{ url_for('portfolio') }}" class="btn btn-outline-light btn-lg px-4 py-3 shadow-lg">View Our Work</a>
+        </div>
+    </div>
+</section>
+
+<!-- About Preview -->
+<section class="py-5 bg-cream">
+    <div class="container text-center">
+        <h2 class="font-heading text-navy mb-4">Why Choose Beatwell?</h2>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <p class="lead">Beatwell Upholstery provides professional solutions tailored for Kariba’s unique climate. From sun-resistant marine fabrics to durable camping gear, we ensure quality that lasts.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Services Preview -->
+<section class="py-5">
+    <div class="container">
+        <h2 class="font-heading text-navy text-center mb-5">Our Services</h2>
+        <div class="row g-4">
+            {% for service in services %}
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <div class="mb-3 text-gold">
+                            <i class="bi bi-tools fs-1"></i> <!-- Placeholder for icon -->
+                        </div>
+                        <h4 class="card-title font-heading text-navy">{{ service.name }}</h4>
+                        <p class="card-text text-muted">{{ service.description }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 text-center pb-4">
+                        <a href="{{ url_for('services') }}" class="btn btn-outline-navy btn-sm">Learn More</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-5">
+            <a href="{{ url_for('services') }}" class="btn btn-navy">View All Services</a>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials -->
+<section class="py-5 bg-forest text-white" style="background-image: linear-gradient(rgba(44, 95, 45, 0.9), rgba(44, 95, 45, 0.9));">
+    <div class="container">
+        <h2 class="font-heading text-center text-gold mb-5">What Our Customers Say</h2>
+        <div class="row g-4">
+            {% for t in testimonials %}
+            <div class="col-md-4">
+                <div class="card testimonial-card h-100 border-0 shadow-sm text-white">
+                    <div class="card-body">
+                        <div class="mb-3 text-gold fs-5">
+                            {% for i in range(t.rating) %}★{% endfor %}
+                        </div>
+                        <p class="card-text fst-italic">"{{ t.content }}"</p>
+                        <footer class="mt-4 pt-3 border-top border-secondary text-gold font-heading fw-bold">{{ t.customer_name }}</footer>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center">
+                <p class="lead mb-3">No testimonials yet.</p>
+                <a href="{{ url_for('testimonial_submit') }}" class="btn btn-outline-light">Be the first — leave a testimonial</a>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-4">
+            <a href="{{ url_for('testimonial_submit') }}" class="btn btn-outline-light">Leave a testimonial</a>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="py-5 text-center bg-cream">
+    <div class="container">
+        <h2 class="font-heading text-navy">Ready to transform your furniture?</h2>
+        <p class="lead mb-4">Contact us today for a free consultation and quote.</p>
+        <a href="{{ url_for('contact') }}" class="btn btn-navy btn-lg">Contact Us</a>
+    </div>
+</section>
+{% endblock %}
