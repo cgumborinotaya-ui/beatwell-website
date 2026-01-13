@@ -1,7 +1,7 @@
-Flask
-Flask-SQLAlchemy
-Werkzeug
-email-validator
+
+Flask==3.1.2
+Flask-SQLAlchemy==3.1.1
 gunicorn==21.2.0
 Pillow==10.2.0
-
+Werkzeug
+email-validator
