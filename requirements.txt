@@ -3,3 +3,5 @@ Flask-SQLAlchemy
 Werkzeug
 email-validator
 gunicorn==21.2.0
+Pillow==10.2.0
+
