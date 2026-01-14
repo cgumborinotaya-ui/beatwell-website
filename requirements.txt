@@ -2,6 +2,6 @@ Flask
 Flask-SQLAlchemy
 Werkzeug
 email-validator
-gunicorn
+gunicorn; platform_system != "Windows"
 Pillow
 psycopg2-binary
