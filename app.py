@@ -2,9 +2,18 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from sqlalchemy import text
 from datetime import datetime
 import os
 import uuid
+import hashlib
+import secrets
+import base64
+import smtplib
+from email.message import EmailMessage
+import urllib.parse
+import urllib.request
+import re
 from PIL import Image, ImageFilter
 
 app = Flask(__name__)
@@ -16,6 +25,7 @@ if database_url and database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or f'sqlite:///{default_db_path}'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'img', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['RESET_TOKEN_TTL_SECONDS'] = 60 * 30
 
 db = SQLAlchemy(app)
 
@@ -25,12 +35,76 @@ def _allowed_upload(filename: str) -> bool:
     _, ext = os.path.splitext(filename.lower())
     return ext in ALLOWED_UPLOAD_EXTENSIONS
 
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+def _send_reset_email(to_email: str, reset_url: str) -> bool:
+    smtp_host = os.environ.get('SMTP_HOST')
+    if not smtp_host:
+        return False
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_password = os.environ.get('SMTP_PASSWORD')
+    smtp_use_tls = os.environ.get('SMTP_USE_TLS', '1') == '1'
+    from_email = os.environ.get('FROM_EMAIL') or smtp_user
+    if not from_email:
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = 'Password Reset'
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg.set_content(
+        "You requested a password reset.\n\n"
+        f"Reset your password using this link:\n{reset_url}\n\n"
+        "If you did not request this, ignore this email."
+    )
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+        if smtp_use_tls:
+            server.starttls()
+        if smtp_user and smtp_password:
+            server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+    return True
+
+def _send_reset_sms(to_phone: str, reset_url: str) -> bool:
+    sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    token = os.environ.get('TWILIO_AUTH_TOKEN')
+    from_number = os.environ.get('TWILIO_FROM_NUMBER')
+    if not sid or not token or not from_number:
+        return False
+
+    body = f"Beatwell password reset: {reset_url}"
+    data = urllib.parse.urlencode({
+        'From': from_number,
+        'To': to_phone,
+        'Body': body,
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        f'https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json',
+        data=data,
+        method='POST'
+    )
+    auth = base64.b64encode(f'{sid}:{token}'.encode('utf-8')).decode('ascii')
+    req.add_header('Authorization', 'Basic ' + auth)
+    req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return 200 <= resp.status < 300
+    except Exception:
+        return False
+
 # --- Models ---
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(255), nullable=True)
+    phone_number = db.Column(db.String(30), nullable=True)
 
 class Service(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +130,14 @@ class Testimonial(db.Model):
     content = db.Column(db.Text, nullable=False)
     rating = db.Column(db.Integer, default=5)
     approved = db.Column(db.Boolean, default=False)
+
+class PasswordReset(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 # --- Routes ---
 
@@ -261,13 +343,144 @@ def login():
         flash('Invalid credentials', 'danger')
     return render_template('login.html')
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        identifier = (request.form.get('identifier') or '').strip()
+        method = (request.form.get('method') or 'email').strip().lower()
+
+        user = None
+        if identifier:
+            user = User.query.filter_by(username=identifier).first()
+            if not user:
+                user = User.query.filter_by(email=identifier).first()
+            if not user:
+                user = User.query.filter_by(phone_number=identifier).first()
+
+        flash('If the account exists, reset instructions have been sent.', 'info')
+
+        if not user:
+            return redirect(url_for('forgot_password'))
+
+        token = secrets.token_urlsafe(32)
+        token_hash = _hash_token(token)
+        ttl_seconds = int(app.config.get('RESET_TOKEN_TTL_SECONDS', 1800))
+        from datetime import timedelta
+        expires_at = datetime.utcnow().replace(microsecond=0) + timedelta(seconds=ttl_seconds)
+
+        reset = PasswordReset(user_id=user.id, token_hash=token_hash, expires_at=expires_at, used_at=None)
+        db.session.add(reset)
+        db.session.commit()
+
+        reset_url = url_for('reset_password', token=token, _external=True)
+        sent = False
+        if method == 'sms':
+            if user.phone_number:
+                sent = _send_reset_sms(user.phone_number, reset_url)
+        else:
+            if user.email:
+                sent = _send_reset_email(user.email, reset_url)
+
+        if not sent and app.debug:
+            flash(f'DEBUG reset link: {reset_url}', 'warning')
+
+        return redirect(url_for('login'))
+
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    token_hash = _hash_token(token)
+    reset = PasswordReset.query.filter_by(token_hash=token_hash).first()
+    if not reset or reset.used_at is not None or reset.expires_at < datetime.utcnow():
+        flash('This password reset link is invalid or expired.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password') or ''
+        confirm = request.form.get('confirm_password') or ''
+        if len(password) < 8:
+            flash('Password must be at least 8 characters.', 'danger')
+            return redirect(url_for('reset_password', token=token))
+        if password != confirm:
+            flash('Passwords do not match.', 'danger')
+            return redirect(url_for('reset_password', token=token))
+
+        user = User.query.get(reset.user_id)
+        if not user:
+            flash('Account not found.', 'danger')
+            return redirect(url_for('forgot_password'))
+
+        user.password_hash = generate_password_hash(password)
+        reset.used_at = datetime.utcnow()
+        db.session.commit()
+        flash('Password updated. You can now log in.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('reset_password.html')
+
 @app.route('/admin')
 def admin_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    admin_user = User.query.get(session.get('user_id'))
     quotes = QuoteRequest.query.order_by(QuoteRequest.created_at.desc()).all()
     testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
-    return render_template('admin.html', quotes=quotes, testimonials=testimonials)
+    return render_template('admin.html', quotes=quotes, testimonials=testimonials, admin_user=admin_user)
+
+@app.route('/admin/profile', methods=['POST'])
+def update_admin_profile():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(session.get('user_id'))
+    email = (request.form.get('email') or '').strip()
+    phone = (request.form.get('phone_number') or '').strip()
+
+    if email:
+        if len(email) > 255 or '@' not in email:
+            flash('Please enter a valid email address.', 'danger')
+            return redirect(url_for('admin_dashboard'))
+
+    if phone:
+        cleaned = re.sub(r'[\s\-\(\)]', '', phone)
+        if len(cleaned) > 30 or not re.fullmatch(r'^\+?\d{6,30}$', cleaned):
+            flash('Please enter a valid phone number (digits, optional +).', 'danger')
+            return redirect(url_for('admin_dashboard'))
+        phone = cleaned
+
+    user.email = email or None
+    user.phone_number = phone or None
+    db.session.commit()
+    flash('Admin contact details updated.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/change-password', methods=['POST'])
+def change_admin_password():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(session.get('user_id'))
+    current_password = request.form.get('current_password') or ''
+    new_password = request.form.get('new_password') or ''
+    confirm_password = request.form.get('confirm_password') or ''
+
+    if not check_password_hash(user.password_hash, current_password):
+        flash('Current password is incorrect.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    if len(new_password) < 8:
+        flash('New password must be at least 8 characters.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    if new_password != confirm_password:
+        flash('New passwords do not match.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    flash('Password changed successfully.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/testimonial/<int:id>/approve', methods=['POST'])
 def approve_testimonial(id):
@@ -310,9 +523,45 @@ def init_db():
         os.makedirs(app.instance_path, exist_ok=True)
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', password_hash=generate_password_hash('admin123'))
+
+        if db.engine.dialect.name == 'sqlite':
+            cols = db.session.execute(text("PRAGMA table_info(user)")).fetchall()
+            existing = {c[1] for c in cols}
+            if 'email' not in existing:
+                db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
+            if 'phone_number' not in existing:
+                db.session.execute(text("ALTER TABLE user ADD COLUMN phone_number VARCHAR(30)"))
+            db.session.commit()
+
+        admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        admin_password = os.environ.get('ADMIN_PASSWORD')
+        admin_password_hash = os.environ.get('ADMIN_PASSWORD_HASH')
+        admin_reset_password_on_start = os.environ.get('ADMIN_RESET_PASSWORD_ON_START', '0') == '1'
+
+        existing_admin = User.query.filter_by(username=admin_username).first()
+        if not existing_admin:
+            password_hash = generate_password_hash(admin_password or 'admin123')
+            if admin_password_hash:
+                password_hash = admin_password_hash
+            admin = User(
+                username=admin_username,
+                password_hash=password_hash,
+                email=os.environ.get('ADMIN_EMAIL'),
+                phone_number=os.environ.get('ADMIN_PHONE')
+            )
             db.session.add(admin)
+            db.session.commit()
+        else:
+            admin = existing_admin
+            if not admin.email and os.environ.get('ADMIN_EMAIL'):
+                admin.email = os.environ.get('ADMIN_EMAIL')
+            if not admin.phone_number and os.environ.get('ADMIN_PHONE'):
+                admin.phone_number = os.environ.get('ADMIN_PHONE')
+            if admin_reset_password_on_start:
+                if admin_password:
+                    admin.password_hash = generate_password_hash(admin_password)
+                if admin_password_hash:
+                    admin.password_hash = admin_password_hash
             db.session.commit()
 
         categories = [
